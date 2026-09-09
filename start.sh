@@ -58,7 +58,7 @@ start_postgres() {
     echo ""
     echo "✅ Ambiente iniciado com sucesso!"
     echo "👉 Aplicação Spring Boot: http://localhost:${APP_PORT:-8090}"
-    echo "👉 pgAdmin 4 (Postgres):  http://localhost:${PGADMIN_PORT:-5658} (${PGADMIN_EMAIL:-admin@tgos.local} / ${PGADMIN_PASSWORD})"
+    echo "👉 pgAdmin 4 (Postgres):  http://localhost:${PGADMIN_PORT:-5658} (${PGADMIN_EMAIL:-admin@admin.com} / ${PGADMIN_PASSWORD})"
     echo "👉 Conexão PostgreSQL:    localhost:${POSTGRES_PORT:-5433} (user: ${DB_USER:-desenvolvedor} / pass: ${DB_PASSWORD})"
     echo "👉 Painel RabbitMQ:       http://localhost:${RABBITMQ_MANAGEMENT_PORT:-15673} (${RABBITMQ_USER:-guest} / ${RABBITMQ_PASS:-guest})"
     echo "👉 Cache Redis:           localhost:${REDIS_PORT:-6380}"

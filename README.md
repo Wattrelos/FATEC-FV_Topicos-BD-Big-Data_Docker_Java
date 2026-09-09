@@ -147,11 +147,11 @@ Se preferir rodar a aplicação localmente pelo VS Code / IntelliJ conectando no
 - ☕ **Aplicação Java Spring Boot**: **[http://localhost:8090](http://localhost:8090)**
   - Dashboard de Diagnóstico: **[http://localhost:8090/diagnostico](http://localhost:8090/diagnostico)**
 - 🐬 **MariaDB Web (phpMyAdmin)**: **[http://localhost:5657](http://localhost:5657)**
-  - Usuário: `desenvolvedor` / Senha: `` (ou `root` / `rootsecret`)
+  - Usuário: `desenvolvedor` / Senha: `b2#FbXPQTu4FYw` (ou `root` / `rootsecret`)
   - Banco de Dados: `tgos_db`
 - 🐘 **PostgreSQL Web (pgAdmin 4)**: **[http://localhost:5658](http://localhost:5658)**
-  - Email: `admin@tgos.local` / Senha: `rootsecret`
-  - Conexão com o banco: Host `db`, Porta `5432`, Usuário `desenvolvedor`, Senha ``, Banco `tgos_db`
+  - Email: `admin@admin.com` / Senha: `rootsecret`
+  - Conexão com o banco: Host `db`, Porta `5432`, Usuário `desenvolvedor`, Senha: `b2#FbXPQTu4FYw`, Banco `tgos_db`
 - 🐇 **Painel Web do RabbitMQ**: **[http://localhost:15673](http://localhost:15673)**
   - Usuário: `guest` / Senha: `guest`
 - ⚡ **Redis**: `localhost:6380` (porta interna `6379`)

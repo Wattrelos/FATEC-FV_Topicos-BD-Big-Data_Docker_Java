@@ -22,10 +22,14 @@ WORKDIR /app
 
 # Criação de usuário sem privilégios de root para segurança
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-USER appuser
 
 # Copia o .jar compilado do estágio de build
-COPY --from=build /app/target/*.jar app.jar
+COPY --from=build --chown=appuser:appgroup /app/target/*.jar app.jar
+
+# Garante permissões de escrita para appuser no diretório de trabalho
+RUN chown -R appuser:appgroup /app
+
+USER appuser
 
 # Porta padrão exposta pelo Spring Boot (8089)
 EXPOSE 8089

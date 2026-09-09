@@ -3,7 +3,7 @@ services:
   app:
     build:
       context: ./Tgos
-      dockerfile: Dockerfile
+      dockerfile: ../Dockerfile
     container_name: tgos_app
     restart: unless-stopped
     ports:

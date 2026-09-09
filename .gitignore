@@ -1,4 +1,6 @@
 # Outro projeto de outro repositório
 Tgos/
+Tgos/**
+Tgos/**/**
 # Arquivos de configuração
 .env
