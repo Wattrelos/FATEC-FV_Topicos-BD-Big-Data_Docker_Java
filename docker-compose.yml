@@ -7,57 +7,22 @@ services:
     container_name: tgos_app
     restart: unless-stopped
     ports:
-      - "8090:8089"
+      - "${APP_PORT:-8090}:8089"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mariadb://mariadb:3306/tgos_db
-      SPRING_DATASOURCE_USERNAME: desenvolvedor
-      SPRING_DATASOURCE_PASSWORD: b2#FbXPQTu4FYw
+      # Configurações de Cache (Redis) e Mensageria (RabbitMQ)
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       SPRING_RABBITMQ_HOST: rabbitmq
       SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS:-guest}
     depends_on:
-      mariadb:
+      db:
         condition: service_healthy
       redis:
         condition: service_started
       rabbitmq:
         condition: service_started
-
-  # Banco de Dados Relacional (MariaDB 10 LTS)
-  mariadb:
-    image: mariadb:10.11
-    container_name: tgos_mariadb
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: rootsecret
-      MYSQL_DATABASE: tgos_db
-      MYSQL_USER: desenvolvedor
-      MYSQL_PASSWORD: b2#FbXPQTu4FYw
-    ports:
-      # Host 3308 -> Contêiner 3306 (garante coexistência perfeita com Docker 1 e sem conflitos)
-      - "3308:3306"
-    volumes:
-      - db_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  # Interface Web para Gerenciamento do Banco de Dados
-  phpmyadmin:
-    image: phpmyadmin:latest
-    container_name: tgos_db_manager
-    restart: unless-stopped
-    ports:
-      - "5657:80"
-    environment:
-      PMA_HOST: mariadb
-      PMA_PORT: 3306
-      UPLOAD_LIMIT: 64M
-    depends_on:
-      - mariadb
 
   # Cache em Memória
   redis:
@@ -65,7 +30,7 @@ services:
     container_name: tgos_redis
     restart: unless-stopped
     ports:
-      - "6380:6379"
+      - "${REDIS_PORT:-6380}:6379"
 
   # Gerenciador de Mensagens e Filas
   rabbitmq:
@@ -73,11 +38,8 @@ services:
     container_name: tgos_rabbitmq
     restart: unless-stopped
     ports:
-      - "5673:5672"   # Protocolo AMQP externo
-      - "15673:15672" # Painel Web do RabbitMQ
+      - "${RABBITMQ_AMQP_PORT:-5673}:5672"         # Protocolo AMQP externo
+      - "${RABBITMQ_MANAGEMENT_PORT:-15673}:15672" # Painel Web do RabbitMQ
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-
-volumes:
-  db_data:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}

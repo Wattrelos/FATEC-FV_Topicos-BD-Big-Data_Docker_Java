@@ -1,0 +1,64 @@
+services:
+  # Injeção das variáveis de conexão PostgreSQL no Backend Spring Boot
+  app:
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+
+  # Banco de Dados Relacional (PostgreSQL 16 - Suportado)
+  db:
+    image: postgres:16-alpine
+    container_name: tgos_postgresql
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      # Host 5433 -> Contêiner 5432 (evita conflitos com porta padrão 5432 do host)
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      default:
+        aliases:
+          - postgres
+          - postgresql
+
+  # Interface Web para Gerenciamento do PostgreSQL (pgAdmin 4)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: tgos_db_manager_pg
+    restart: unless-stopped
+    ports:
+      - "${PGADMIN_PORT}:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Alternativa ultraleve (~15MB): Caso prefira Adminer ao pgAdmin, basta descomentar abaixo:
+  # adminer:
+  #   image: adminer:latest
+  #   container_name: tgos_adminer
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${PGADMIN_PORT:-5658}:8080"
+  #   environment:
+  #     ADMINER_DEFAULT_SERVER: db
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+
+volumes:
+  postgres_data:

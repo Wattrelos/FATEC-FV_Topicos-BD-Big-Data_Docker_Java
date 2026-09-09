@@ -1,0 +1,51 @@
+services:
+  # Injeção das variáveis de conexão MariaDB no Backend Spring Boot
+  app:
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mariadb://db:3306/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.mariadb.jdbc.Driver
+
+  # Banco de Dados Relacional (MariaDB 10 LTS - Recomendado)
+  db:
+    image: mariadb:10.11
+    container_name: tgos_mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      # Host 3308 -> Contêiner 3306 (garante coexistência perfeita com Docker 1 e sem conflitos)
+      - "${MARIADB_PORT:-3308}:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      default:
+        aliases:
+          - mariadb
+
+  # Interface Web para Gerenciamento do MariaDB
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: tgos_db_manager
+    restart: unless-stopped
+    ports:
+      - "${PMA_PORT:-5657}:80"
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      UPLOAD_LIMIT: ${PMA_UPLOAD_LIMIT:-64M}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  mariadb_data:

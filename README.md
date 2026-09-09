@@ -10,115 +10,148 @@ No projeto anterior em PHP, a arquitetura exigia um servidor web **NGINX** na fr
 
 No **Java Spring Boot**, essa complexidade não é necessária:
 - **Embedded Tomcat**: O Spring Boot já inclui um servidor web HTTP embutido de alta performance dentro do próprio arquivo `.jar`.
-- **Um único contêiner para a aplicação**: Não precisamos de NGINX nem de contêiner separado de Tomcat. O próprio contêiner Java expõe a porta `8089` diretamente para o seu navegador.
+- **Um único contêiner para a aplicação**: Não precisamos de NGINX nem de contêiner separado de Tomcat. O próprio contêiner Java expõe a porta `8089` diretamente para o seu navegador (mapeada para `8090` no host).
 - **Compilação Multi-stage**: O Dockerfile compila o código-fonte com **Maven + Java 21** e gera uma imagem final ultraleve baseada em **Alpine Linux + JRE 21**.
 
 ---
 
-## 2. Visão Geral da Arquitetura de Contêineres
+## 2. Visão Geral da Arquitetura e Opções de Banco de Dados
 
-O arquivo [docker-compose.yml](file:///home/wattrelos/Docker2/docker-compose.yml) orquestra os seguintes serviços:
+O ambiente foi estruturado de forma modular para permitir que você escolha entre **MariaDB 10 LTS** (Recomendado) ou **PostgreSQL 16** (Suportado), atendendo aos requisitos de [ambiente.md](file:///home/wattrelos/Docker2/ambiente.md).
 
-| Serviço | Imagem Base | Porta Externa (Host) | Porta Interna (Rede Docker) | Finalidade |
+### Serviços Compartilhados ([docker-compose.yml](file:///home/wattrelos/Docker2/docker-compose.yml))
+| Serviço | Imagem Base | Porta Host | Porta Docker | Finalidade |
 | :--- | :--- | :--- | :--- | :--- |
-| **`app`** | Customizada via [Dockerfile](file:///home/wattrelos/Docker2/Dockerfile) | **8090** | `8089` | Backend Java 21 Spring Boot com servidor Tomcat embutido |
-| **`mariadb`** | `mariadb:10.11` | **3308** | `3306` | Banco de dados relacional (MariaDB 10 LTS) |
-| **`phpmyadmin`** | `phpmyadmin:latest` | **5657** | `80` | Interface Web para gerenciar o banco MariaDB visualmente |
+| **`app`** | Customizada via [Dockerfile](file:///home/wattrelos/Docker2/Dockerfile) | **8090** | `8089` | Backend Java 21 Spring Boot |
 | **`redis`** | `redis:alpine` | **6380** | `6379` | Cache em memória ultrarrápido |
-| **`rabbitmq`** | `rabbitmq:3-management-alpine` | **5673** / **15673** | `5672` / `15672` | Broker de mensageria e painel web de gerenciamento |
+| **`rabbitmq`** | `rabbitmq:3-management-alpine` | **5673** / **15673** | `5672` / `15672` | Broker AMQP e painel web de filas |
+
+### Opção 1: MariaDB ([docker-compose.mariadb.yml](file:///home/wattrelos/Docker2/docker-compose.mariadb.yml)) - *Recomendado*
+| Serviço | Imagem Base | Porta Host | Porta Docker | Finalidade |
+| :--- | :--- | :--- | :--- | :--- |
+| **`db`** | `mariadb:10.11` | **3308** | `3306` | Banco Relacional MariaDB 10 LTS |
+| **`phpmyadmin`** | `phpmyadmin:latest` | **5657** | `80` | Interface Web para gerenciar o MariaDB |
+
+### Opção 2: PostgreSQL ([docker-compose.postgres.yml](file:///home/wattrelos/Docker2/docker-compose.postgres.yml)) - *Suportado*
+| Serviço | Imagem Base | Porta Host | Porta Docker | Finalidade |
+| :--- | :--- | :--- | :--- | :--- |
+| **`db`** | `postgres:16-alpine` | **5433** | `5432` | Banco Relacional PostgreSQL 16 |
+| **`pgadmin`** | `dpage/pgadmin4:latest` | **5658** | `80` | Interface Web para gerenciar o PostgreSQL |
 
 > [!TIP]
-> **Zero Conflito com Docker 1 (PHP):**
-> Todas as portas externas do **Docker2** foram intencionalmente mapeadas de forma isolada (`8090`, `3308`, `5657`, `6380`, `5673`, `15673`). Assim, você pode manter tanto o **Docker 1** (PHP SaaS) quanto o **Docker 2** (Java Spring Boot) ativos simultaneamente sem nenhum conflito de porta no seu computador. Internamente na rede Docker, cada serviço continua ouvindo em suas portas padrão.
+> **Zero Conflito com Docker 1 (PHP) e Portas Locais:**
+> Todas as portas externas do **Docker2** foram intencionalmente mapeadas de forma isolada (`8090`, `3308`, `5433`, `5657`, `5658`, `6380`, `5673`, `15673`). Assim, você pode manter tanto o **Docker 1** quanto o **Docker 2** ativos simultaneamente sem nenhum conflito de portas.
 
 ---
 
-## 3. Como funciona o Dockerfile Multi-stage?
+## 3. Como Escolher e Alternar o Banco de Dados
 
-O arquivo [Dockerfile](file:///home/wattrelos/Docker2/Dockerfile) utiliza o padrão moderno **Multi-Stage Build**:
+Você tem **3 formas práticas** de alternar entre as opções:
 
-```dockerfile
-# 1. Estágio de Build: Compila com Maven e Java 21 oficial
-FROM maven:3.9.6-eclipse-temurin-21 AS build
-WORKDIR /app
-COPY pom.xml .
-RUN mvn dependency:go-offline -B || true
-COPY src ./src
-RUN mvn clean package -DskipTests
-
-# 2. Estágio de Runtime: Imagem final enxuta com JRE 21
-FROM eclipse-temurin:21-jre-alpine
-WORKDIR /app
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-USER appuser
-COPY --from=build /app/target/*.jar app.jar
-EXPOSE 8089
-ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]
+### Modo 1: Script Interativo (Mais Fácil)
+Basta executar o script [start.sh](file:///home/wattrelos/Docker2/start.sh):
+```bash
+./start.sh
+```
+Ou passar diretamente o argumento:
+```bash
+./start.sh mariadb   # Sobe com MariaDB 10 + phpMyAdmin
+./start.sh postgres  # Sobe com PostgreSQL 16 + pgAdmin 4
+./start.sh down      # Encerra os contêineres
+./start.sh status    # Exibe o status dos contêineres
 ```
 
-### Vantagens:
-- **Você não precisa ter o Maven instalado** na sua máquina para compilar ou subir o projeto; o Docker faz tudo isoladamente.
-- **Tamanho reduzido**: O código-fonte e as ferramentas de compilação ficam no primeiro estágio; a imagem final contém apenas o binário `.jar` e o JRE.
-- **Segurança**: A aplicação roda com usuário não-root (`appuser`).
+### Modo 2: Pelo arquivo [.env](file:///home/wattrelos/Docker2/.env)
+Edite a variável `COMPOSE_FILE` no arquivo `.env`:
+```env
+# Para MariaDB (padrão):
+COMPOSE_FILE=docker-compose.yml:docker-compose.mariadb.yml
+
+# Para PostgreSQL:
+# COMPOSE_FILE=docker-compose.yml:docker-compose.postgres.yml
+```
+Depois, basta rodar o comando padrão do compose:
+```bash
+docker compose up -d
+```
+
+### Modo 3: Flags Explícitas na Linha de Comando
+```bash
+# Rodar com MariaDB:
+docker compose -f docker-compose.yml -f docker-compose.mariadb.yml up -d
+
+# Rodar com PostgreSQL:
+docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
+```
+
+### 3.1 Centralização e Segurança das Credenciais
+Todas as credenciais de banco, filas e portas estão centralizadas e protegidas no arquivo [`.env`](file:///home/wattrelos/Docker2/.env) (com modelo de referência em [`.env.example`](file:///home/wattrelos/Docker2/.env.example)):
+- O arquivo `.env` é protegido pelo [`.gitignore`](file:///home/wattrelos/Docker2/.gitignore) para nunca expor senhas no repositório.
+- Se você clonar o projeto em outra máquina, basta rodar `cp .env.example .env` (ou executar `./start.sh`, que cria o `.env` automaticamente).
+- Os arquivos do Docker Compose utilizam valores dinâmicos (`${DB_PASSWORD:-...}`) com fallbacks seguros.
 
 ---
 
 ## 4. Como a aplicação se comunica com os serviços?
 
-Dentro da rede do Docker Compose, a comunicação entre contêineres utiliza os **nomes dos serviços como hostnames**:
+Dentro da rede Docker Compose, o Spring Boot conecta-se ao banco de dados utilizando o hostname padrão **`db`**:
 
-- **Host do MariaDB**: `mariadb` (porta interna `3306`)
-  - URL JDBC interna: `jdbc:mariadb://mariadb:3306/tgos_db`
-- **Host do Redis**: `redis` (porta interna `6379`)
-- **Host do RabbitMQ**: `rabbitmq` (porta interna `5672`)
+- **Com MariaDB**:
+  - URL JDBC: `jdbc:mariadb://db:3306/tgos_db`
+  - Driver: `org.mariadb.jdbc.Driver`
+- **Com PostgreSQL**:
+  - URL JDBC: `jdbc:postgresql://db:5432/tgos_db`
+  - Driver: `org.postgresql.Driver`
+- **Host do Redis**: `redis:6379`
+- **Host do RabbitMQ**: `rabbitmq:5672`
 
 ### E se eu quiser rodar o Spring Boot fora do Docker (na IDE)?
 Se preferir rodar a aplicação localmente pelo VS Code / IntelliJ conectando nos contêineres do Docker:
-- Suba apenas as dependências:
+- Suba as dependências (exemplo com MariaDB):
   ```bash
-  docker compose up -d mariadb phpmyadmin redis rabbitmq
+  docker compose -f docker-compose.yml -f docker-compose.mariadb.yml up -d db phpmyadmin redis rabbitmq
   ```
-- O banco estará disponível para sua máquina em `localhost:3307`. As classes [AppConfig](file:///home/wattrelos/Docker2/Tgos/src/main/java/com/gwj/AppConfig.java) e [application.properties](file:///home/wattrelos/Docker2/Tgos/src/main/resources/application.properties) já possuem tratamento automático para alternar entre as conexões.
+  *(Ou para PostgreSQL, use `-f docker-compose.postgres.yml` subindo `db pgadmin redis rabbitmq`)*
+- O MariaDB estará disponível em `localhost:3308`.
+- O PostgreSQL estará disponível em `localhost:5433`.
 
 ---
 
 ## 5. Comandos essenciais para o dia a dia
 
-1. **Construir e iniciar todos os serviços em segundo plano**:
+1. **Construir e iniciar os serviços em segundo plano**:
    ```bash
    docker compose up -d --build
    ```
-2. **Verificar se os contêineres estão rodando**:
+2. **Verificar o status dos contêineres**:
    ```bash
    docker compose ps
    ```
-3. **Acompanhar os logs da aplicação Java em tempo real**:
+3. **Acompanhar os logs da aplicação Java**:
    ```bash
    docker compose logs -f app
    ```
-4. **Reiniciar apenas a aplicação após alterações**:
+4. **Acompanhar os logs do banco de dados**:
    ```bash
-   docker compose restart app
+   docker compose logs -f db
    ```
-5. **Parar todos os contêineres sem perder os dados do banco**:
+5. **Parar os contêineres sem perder os dados dos volumes**:
    ```bash
    docker compose down
    ```
 
 ---
 
-## 6. Dashboard de Diagnóstico em Tempo Real
+## 6. URLs de Acesso e Credenciais
 
-Assim como no Docker 1, criamos um painel visual completo de diagnóstico em tempo real no Spring Boot:
-
-👉 **[http://localhost:8090/diagnostico](http://localhost:8090/diagnostico)**
-
-### O que o diagnóstico valida:
-- ☕ **Java Runtime**: Versão exata do Java 21 LTS (Eclipse Temurin), vendor e uso de memória em MB.
-- 🐬 **MariaDB**: Conexão ativa com o banco `tgos_db`, versão do banco (10.11 LTS) e latência em milissegundos.
-- ⚡ **Redis**: Teste de conexão na porta `6380` (interna `6379`), resposta `+PONG` e latência.
-- 🐇 **RabbitMQ**: Teste de conexão no protocolo AMQP na porta `5673` (interna `5672`) e latência.
-- 🔗 **Acesso Rápido**:
-  - Interface Web do Banco (phpMyAdmin): **[http://localhost:5657](http://localhost:5657)** (usuário: `desenvolvedor` / senha: `b2#FbXPQTu4FYw` ou `root` / `rootsecret`)
-  - Painel Web RabbitMQ: **[http://localhost:15673](http://localhost:15673)** (usuário: `guest` / senha: `guest`)
-  - Página Inicial do Sistema: **[http://localhost:8090](http://localhost:8090)**
+- ☕ **Aplicação Java Spring Boot**: **[http://localhost:8090](http://localhost:8090)**
+  - Dashboard de Diagnóstico: **[http://localhost:8090/diagnostico](http://localhost:8090/diagnostico)**
+- 🐬 **MariaDB Web (phpMyAdmin)**: **[http://localhost:5657](http://localhost:5657)**
+  - Usuário: `desenvolvedor` / Senha: `` (ou `root` / `rootsecret`)
+  - Banco de Dados: `tgos_db`
+- 🐘 **PostgreSQL Web (pgAdmin 4)**: **[http://localhost:5658](http://localhost:5658)**
+  - Email: `admin@tgos.local` / Senha: `rootsecret`
+  - Conexão com o banco: Host `db`, Porta `5432`, Usuário `desenvolvedor`, Senha ``, Banco `tgos_db`
+- 🐇 **Painel Web do RabbitMQ**: **[http://localhost:15673](http://localhost:15673)**
+  - Usuário: `guest` / Senha: `guest`
+- ⚡ **Redis**: `localhost:6380` (porta interna `6379`)
